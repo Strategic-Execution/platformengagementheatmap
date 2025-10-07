@@ -1,0 +1,1655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Platform Engagement Heatmap (Fixed Header)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js" defer></script>
+<style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+        font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;
+        background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+        color: #222;
+    }
+
+    .container {
+        max-width: 98%;
+        margin: 0 auto;
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        display: flex;
+        flex-direction: column;
+        position: relative;
+    }
+
+    .header {
+        background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+        color: #fff;
+        padding: 30px 40px;
+        text-align: center;
+        border-top-left-radius: 16px;
+        border-top-right-radius: 16px;
+    }
+    .header h1 { font-size: 2.2rem; margin-bottom: 8px; font-weight: 700; }
+    .header p { font-size: 1rem; opacity: .95; }
+
+    .controls {
+        padding: 24px 40px;
+        background: #f8f9fa;
+        border-bottom: 2px solid #e9ecef;
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .file-upload { position: relative; }
+    .file-upload input[type=file] { position: absolute; left: -9999px; }
+    .file-upload label {
+        display: inline-block;
+        padding: 10px 26px;
+        background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+        color: #fff;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: .25s;
+        box-shadow: 0 4px 15px rgba(102,126,234,0.4);
+    }
+    .file-upload label:hover { transform: translateY(-2px); box-shadow:0 6px 20px rgba(102,126,234,0.6); }
+
+    .json-upload { position: relative; }
+    .json-upload input[type=file] { position: absolute; left: -9999px; }
+    .json-upload label {
+        display: inline-block;
+        padding: 10px 26px;
+        background: #17a2b8;
+        color: #fff;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: .25s;
+        box-shadow: 0 4px 15px rgba(23,162,184,0.4);
+    }
+    .json-upload label:hover { 
+        transform: translateY(-2px); 
+        box-shadow: 0 6px 20px rgba(23,162,184,0.6);
+        background: #138496;
+    }
+
+    .table-btn {
+        padding: 10px 26px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: .95rem;
+        transition: .25s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .table-btn-primary {
+        background: linear-gradient(135deg,#7a8df5 0%,#8759b3 100%);
+        color: #fff;
+        box-shadow: 0 4px 15px rgba(122,141,245,0.4);
+    }
+    .table-btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(122,141,245,0.6);
+    }
+    
+    .table-btn-success {
+        background: #20c997;
+        color: #fff;
+        box-shadow: 0 4px 15px rgba(32,201,151,0.4);
+    }
+    .table-btn-success:hover {
+        background: #1ba47e;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(32,201,151,0.6);
+    }
+
+    .save-btn {
+        padding:10px 26px;
+        background:#28a745;
+        color:#fff;
+        border:none;
+        border-radius:8px;
+        cursor:pointer;
+        font-weight:600;
+        font-size:.95rem;
+        transition:.25s;
+        box-shadow:0 4px 15px rgba(40,167,69,0.4);
+        margin-left: auto;
+    }
+    .save-btn:hover {
+        transform:translateY(-2px);
+        box-shadow:0 6px 20px rgba(40,167,69,0.6);
+        background:#218838;
+    }
+
+    .file-name { 
+        color:#555; 
+        font-style:italic; 
+        flex:1; 
+        min-width: 200px;
+    }
+
+    .filters {
+        background:#fff;
+        border-bottom:2px solid #e9ecef;
+        display:none;
+    }
+    .filters.active { display:block; }
+    .filters.collapsed .filter-content { display:none; }
+
+    .filter-header {
+        padding:18px 40px;
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        cursor:pointer;
+        background:#f8f9fa;
+        transition:.25s;
+    }
+    .filter-header:hover { background:#e9ecef; }
+    .filter-header h3 { margin:0; font-size:1.05rem; font-weight:600; color:#333; }
+    .filter-toggle { font-size:1.3rem; color:#667eea; font-weight:bold; transition:.25s; }
+    .filters.collapsed .filter-toggle { transform:rotate(-90deg); }
+
+    .filter-content { padding:18px 40px 28px; }
+
+    .filter-grid {
+        display:grid;
+        gap:18px;
+        grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    }
+    .filter-group { display:flex; flex-direction:column; }
+    .filter-group label {
+        font-weight:600;
+        color:#555;
+        margin-bottom:6px;
+        font-size:.8rem;
+        letter-spacing:.5px;
+        text-transform:uppercase;
+    }
+    .filter-group select {
+        padding:9px 10px;
+        border:2px solid #e9ecef;
+        border-radius:8px;
+        font-size:.9rem;
+        cursor:pointer;
+        background:#fff;
+        transition:border-color .25s;
+    }
+    .filter-group select:focus { outline:none; border-color:#667eea; }
+
+    .filter-actions { margin-top:18px; display:flex; gap:10px; }
+    .filter-btn { padding:9px 20px; border:none; border-radius:8px; font-weight:600; cursor:pointer; font-size:.85rem; }
+    .filter-btn-clear { background:#6c757d; color:#fff; }
+    .filter-btn-clear:hover { background:#5a6268; }
+
+    .legend {
+        padding:24px 40px;
+        background:#fff;
+        border-bottom:2px solid #e9ecef;
+    }
+    .legend-section { margin-bottom:16px; }
+    .legend-section:last-child { margin-bottom:0; }
+    .legend h3 { margin-bottom:12px; font-size:1rem; color:#333; }
+    .legend-items { display:flex; gap:26px; flex-wrap:wrap; }
+    .legend-item { display:flex; align-items:center; gap:10px; font-size:.85rem; }
+    .legend-color { width:38px; height:24px; border-radius:4px; border:1px solid #ddd; }
+    .legend-dot { width:18px; height:18px; border-radius:50%; border:1px solid #ddd; }
+    .legend-label { font-weight:500; color:#555; }
+
+    .heatmap-wrapper {
+        padding:0 40px 40px;
+        position: relative;
+    }
+
+    /* Top horizontal scrollbar always visible */
+    .top-scroll-shell {
+        background:#f1f3f5;
+        border:1px solid #d2d6da;
+        border-radius:6px;
+        height:20px;
+        margin:18px 0 10px;
+        overflow-x:auto;
+        overflow-y:hidden;
+        scrollbar-color:#b8bcc0 #f1f3f5;
+    }
+    .top-scroll-shell::-webkit-scrollbar { height:14px; }
+    .top-scroll-shell::-webkit-scrollbar-track { background:#f1f3f5; }
+    .top-scroll-shell::-webkit-scrollbar-thumb {
+        background:#b8bcc0;
+        border-radius:7px;
+        border:3px solid #f1f3f5;
+    }
+    .top-scroll-inner { height:1px; width:0; }
+
+    /* Table container with fixed height and scroll */
+    .heatmap-container {
+        width:100%;
+        height: 600px; /* Fixed height to create internal scroll */
+        overflow: auto; /* Both scrollbars */
+        position:relative;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        background: #fff;
+    }
+
+    table.heatmap {
+        border-collapse:collapse;
+        width:100%;
+        min-width:max(100%,900px);
+        background:#fff;
+    }
+
+    /* Sticky header within the scrolling container */
+    .heatmap thead th {
+        position: sticky;
+        top: 0;
+        background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+        color:#fff;
+        padding:14px 10px;
+        font-weight:600;
+        font-size:.85rem;
+        border:1px solid #dad5f5;
+        white-space:nowrap;
+        z-index:120;
+        cursor: pointer;
+        user-select: none;
+    }
+    .heatmap thead th:hover {
+        background: linear-gradient(135deg,#7a8df5 0%,#8759b3 100%);
+    }
+
+    /* Sticky first column */
+    .heatmap th:first-child,
+    .heatmap td:first-child {
+        position: sticky;
+        left: 0;
+        z-index:130;
+    }
+    .heatmap th:first-child {
+        text-align:left;
+        padding-left:20px;
+        z-index: 140; /* Higher to stay above other headers when scrolling */
+    }
+    .heatmap td:first-child {
+        background:#f8f9fa;
+        font-weight:600;
+        text-align:left;
+        padding-left:20px;
+        min-width:200px;
+        cursor: pointer;
+        user-select: none;
+        transition: .25s;
+    }
+    .heatmap td:first-child:hover {
+        background:#e9ecef;
+    }
+
+    .heatmap td {
+        border:1px solid #e9ecef;
+        min-width:110px;
+        height:60px;
+        text-align:center;
+        padding:0;
+        background:#fff;
+        position:relative;
+    }
+
+    .cell-content {
+        width:100%; height:100%;
+        display:flex; flex-direction:column;
+        align-items:center; justify-content:center;
+        cursor:pointer; transition:.25s;
+        padding:8px; position:relative;
+    }
+    .cell-content:hover {
+        transform:scale(1.05);
+        box-shadow:inset 0 0 0 2px #333;
+        z-index:2;
+    }
+    .cell-partner-name {
+        font-weight:600;
+        font-size:.75rem;
+        color:#222;
+        text-align:center;
+        line-height:1.2;
+    }
+    .cell-flags {
+        position:absolute; top:4px; right:4px;
+        display:flex; gap:4px;
+    }
+    .flag-dot {
+        width:11px; height:11px;
+        border-radius:50%;
+        border:1px solid rgba(0,0,0,0.25);
+        box-shadow:0 2px 4px rgba(0,0,0,0.2);
+    }
+    .flag-yellow { background:#FFD700; }
+    .flag-red { background:#DC3545; }
+    .cell-comment-indicator {
+        position:absolute;
+        bottom:4px; right:4px;
+        width:7px; height:7px;
+        background:#6c757d;
+        border-radius:50%;
+        box-shadow:0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .empty-state {
+        text-align:center;
+        padding:60px 40px;
+        color:#999;
+    }
+    .empty-state svg {
+        width:100px; height:100px;
+        margin-bottom:18px; opacity:.5;
+    }
+    .empty-state h2 { margin-bottom:8px; font-size:1.3rem; color:#666; }
+
+    /* Modal */
+    .modal {
+        display:none;
+        position:fixed;
+        inset:0;
+        background:rgba(0,0,0,0.5);
+        z-index:1000;
+        align-items:center;
+        justify-content:center;
+    }
+    .modal.active { display:flex; }
+
+    .modal-content {
+        background:#fff;
+        border-radius:14px;
+        padding:28px;
+        max-width:520px;
+        width:92%;
+        max-height:90vh;
+        overflow-y:auto;
+        box-shadow:0 20px 60px rgba(0,0,0,0.35);
+        animation:fadeSlide .3s ease;
+    }
+    @keyframes fadeSlide {
+        from { transform:translateY(-40px); opacity:0; }
+        to { transform:translateY(0); opacity:1; }
+    }
+    .modal-header {
+        display:flex; justify-content:space-between; align-items:center;
+        margin-bottom:18px;
+    }
+    .modal-header h2 { font-size:1.3rem; font-weight:700; color:#333; }
+    .close-btn {
+        background:none; border:none; font-size:1.6rem;
+        cursor:pointer; color:#888; transition:.25s; line-height:1;
+    }
+    .close-btn:hover { color:#333; }
+    .modal-info {
+        background:#f8f9fa;
+        padding:14px 16px;
+        border-radius:10px;
+        margin-bottom:18px;
+        font-size:.9rem;
+    }
+    .modal-info p { margin:4px 0; }
+    
+    .modal-info .current-status {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #dee2e6;
+    }
+    .modal-info .status-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        margin-left: 8px;
+    }
+    
+    .modal-section { margin-bottom:20px; }
+    .modal-section h3 { margin-bottom:10px; font-size:.95rem; font-weight:600; color:#333; }
+
+    .input-group {
+        margin-bottom: 15px;
+    }
+    .input-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+        color: #555;
+        font-size: .85rem;
+    }
+    .input-group input {
+        width: 100%;
+        padding: 10px;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        font-size: .9rem;
+        transition: border-color .25s;
+    }
+    .input-group input:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    /* Engagement status options */
+    .status-options {
+        display:flex;
+        gap:14px;
+        flex-wrap:wrap;
+        margin-bottom:10px;
+    }
+    .status-option {
+        display:flex;
+        align-items:center;
+        gap:8px;
+        padding:10px 14px;
+        border:2px solid #e9ecef;
+        border-radius:10px;
+        cursor:pointer;
+        transition:.25s;
+        font-size:.85rem;
+        background:#fff;
+    }
+    .status-option:hover { border-color:#667eea; background:#f4f6ff; }
+    .status-option input[type=radio] { width:17px; height:17px; cursor:pointer; }
+    .status-preview {
+        width:24px;
+        height:16px;
+        border-radius:3px;
+        border:1px solid rgba(0,0,0,0.2);
+    }
+
+    .override-actions {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #e9ecef;
+    }
+    
+    .btn-override {
+        padding: 8px 16px;
+        background: #ffc107;
+        color: #000;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: .85rem;
+        transition: .25s;
+    }
+    .btn-override:hover {
+        background: #ffb300;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(255,193,7,0.4);
+    }
+
+    .flag-options {
+        display:flex; gap:14px; flex-wrap:wrap;
+    }
+    .flag-option {
+        display:flex; align-items:center; gap:8px;
+        padding:10px 14px;
+        border:2px solid #e9ecef;
+        border-radius:10px;
+        cursor:pointer;
+        transition:.25s;
+        font-size:.85rem;
+        background:#fff;
+    }
+    .flag-option:hover { border-color:#667eea; background:#f4f6ff; }
+    .flag-option input[type=radio] { width:17px; height:17px; cursor:pointer; }
+    .flag-preview {
+        width:16px; height:16px;
+        border-radius:50%; border:1px solid rgba(0,0,0,0.2);
+    }
+
+    .comment-textarea {
+        width:100%; min-height:110px;
+        padding:12px; border:2px solid #e9ecef;
+        border-radius:10px; font-family:inherit;
+        font-size:.9rem; resize:vertical;
+        transition:border-color .25s;
+    }
+    .comment-textarea:focus { outline:none; border-color:#667eea; }
+
+    .modal-footer {
+        display:flex; gap:10px; justify-content:flex-end;
+    }
+    .btn {
+        padding:10px 20px;
+        border:none;
+        border-radius:8px;
+        cursor:pointer;
+        font-weight:600;
+        font-size:.9rem;
+        transition:.25s;
+    }
+    .btn-primary {
+        background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+        color:#fff;
+    }
+    .btn-primary:hover { transform:translateY(-2px); box-shadow:0 4px 12px rgba(102,126,234,0.4); }
+    .btn-secondary { background:#6c757d; color:#fff; }
+    .btn-secondary:hover { background:#5a6268; }
+    .btn-danger { background:#dc3545; color:#fff; }
+    .btn-danger:hover { background:#c82333; }
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Platform Engagement Heatmap</h1>
+            <p>Upload your CSV file to visualise engagement across delivery partners and initiatives</p>
+        </div>
+
+        <div class="controls">
+            <div class="file-upload">
+                <input type="file" id="csvFile" accept=".csv" />
+                <label for="csvFile">📁 Upload CSV</label>
+            </div>
+            
+            <div class="json-upload">
+                <input type="file" id="jsonFile" accept=".json" />
+                <label for="jsonFile">📂 Load JSON</label>
+            </div>
+            
+            <button class="table-btn table-btn-primary" id="addPartnerBtn" style="display:none;">➕ Add Partner</button>
+            <button class="table-btn table-btn-success" id="addInitiativeBtn" style="display:none;">➕ Add Initiative</button>
+            
+            <span class="file-name" id="fileName">No file selected</span>
+            
+            <button class="save-btn" id="saveBtn" style="display:none;">💾 Save Data</button>
+        </div>
+
+        <div class="filters" id="filters">
+            <div class="filter-header" id="filterHeader">
+                <h3>Filter Data</h3>
+                <span class="filter-toggle">▼</span>
+            </div>
+            <div class="filter-content">
+                <div class="filter-grid" id="filterGrid"></div>
+                <div class="filter-actions">
+                    <button class="filter-btn filter-btn-clear" id="clearFilters">Clear All Filters</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="legend" id="legend" style="display:none;">
+            <div class="legend-section">
+                <h3>Engagement Status</h3>
+                <div class="legend-items">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background:#71A8C6;"></div>
+                        <span class="legend-label">Committed</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background:#8CE9FF;"></div>
+                        <span class="legend-label">Engaged</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background:#D0E2EC;"></div>
+                        <span class="legend-label">Not Committed</span>
+                    </div>
+                </div>
+            </div>
+            <div class="legend-section">
+                <h3>Engagement Health</h3>
+                <div class="legend-items">
+                    <div class="legend-item">
+                        <div class="legend-dot flag-yellow"></div>
+                        <span class="legend-label">At Risk (Managed)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot flag-red"></div>
+                        <span class="legend-label">At Risk (Escalation)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="heatmap-wrapper">
+            <!-- Top horizontal scrollbar synced with table -->
+            <div class="top-scroll-shell" id="topScrollShell">
+                <div class="top-scroll-inner" id="topScrollInner"></div>
+            </div>
+
+            <!-- Table container with internal scroll -->
+            <div class="heatmap-container" id="heatmapContainer">
+                <div class="empty-state" id="emptyState">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/>
+                    </svg>
+                    <h2>No Data Loaded</h2>
+                    <p>Upload a CSV file or load a saved JSON file to get started</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cell Details Modal -->
+    <div class="modal" id="commentModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Cell Details</h2>
+                <button class="close-btn" id="closeModal" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-info" id="modalInfo"></div>
+                
+                <!-- Engagement Status section (shown for all cells) -->
+                <div class="modal-section" id="statusSection">
+                    <h3>Engagement Status</h3>
+                    <div class="status-options">
+                        <label class="status-option">
+                            <input type="radio" name="status" value="use-csv">
+                            <span>Use CSV Data</span>
+                        </label>
+                        <label class="status-option">
+                            <input type="radio" name="status" value="">
+                            <span>Clear (Blank)</span>
+                        </label>
+                        <label class="status-option">
+                            <input type="radio" name="status" value="Committed">
+                            <span class="status-preview" style="background:#71A8C6;"></span>
+                            <span>Committed</span>
+                        </label>
+                        <label class="status-option">
+                            <input type="radio" name="status" value="Engaged">
+                            <span class="status-preview" style="background:#8CE9FF;"></span>
+                            <span>Engaged</span>
+                        </label>
+                        <label class="status-option">
+                            <input type="radio" name="status" value="Not Committed">
+                            <span class="status-preview" style="background:#D0E2EC;"></span>
+                            <span>Not Committed</span>
+                        </label>
+                    </div>
+                    <div class="override-actions" id="overrideActions" style="display:none;">
+                        <button class="btn-override" id="clearOverrideBtn">🔄 Clear Manual Override</button>
+                    </div>
+                </div>
+                
+                <div class="modal-section">
+                    <h3>Engagement Health Flag</h3>
+                    <div class="flag-options">
+                        <label class="flag-option">
+                            <input type="radio" name="flag" value="" checked>
+                            <span>None</span>
+                        </label>
+                        <label class="flag-option">
+                            <input type="radio" name="flag" value="yellow">
+                            <span class="flag-preview flag-yellow"></span>
+                            <span>At Risk (Managed)</span>
+                        </label>
+                        <label class="flag-option">
+                            <input type="radio" name="flag" value="red">
+                            <span class="flag-preview flag-red"></span>
+                            <span>At Risk (Escalation)</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="modal-section">
+                    <h3>Comment</h3>
+                    <textarea class="comment-textarea" id="commentText" placeholder="Enter your comment here..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveCommentBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Partner Modal -->
+    <div class="modal" id="partnerModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="partnerModalTitle">Add Partner</h2>
+                <button class="close-btn" id="closePartnerModal" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="partnerName">Partner Name</label>
+                    <input type="text" id="partnerName" placeholder="Enter partner name..." />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="deletePartnerBtn" style="display:none; margin-right:auto;">Delete Partner</button>
+                <button class="btn btn-secondary" id="cancelPartnerBtn">Cancel</button>
+                <button class="btn btn-primary" id="savePartnerBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Initiative Modal -->
+    <div class="modal" id="initiativeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="initiativeModalTitle">Add Initiative</h2>
+                <button class="close-btn" id="closeInitiativeModal" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="initiativeName">Initiative Name</label>
+                    <input type="text" id="initiativeName" placeholder="Enter initiative name..." />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="deleteInitiativeBtn" style="display:none; margin-right:auto;">Delete Initiative</button>
+                <button class="btn btn-secondary" id="cancelInitiativeBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveInitiativeBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+/* Data state */
+let csvData = [];
+let filteredData = [];
+let cellData = {};
+let renamedPartners = {}; // Track partner renames: oldName -> newName
+let renamedInitiatives = {}; // Track initiative renames: oldName -> newName
+let deletedPartners = []; // Track deleted partners
+let deletedInitiatives = []; // Track deleted initiatives
+let manualPartners = [];
+let manualInitiatives = [];
+let currentCell = null;
+let currentPartner = null;
+let currentInitiative = null;
+let activeFilters = {};
+let currentFileName = 'No file selected';
+let currentlyFocusedField = null;
+
+const statusColors = {
+    'Committed': '#71A8C6',
+    'Engaged': '#8CE9FF',
+    'Not Committed': '#D0E2EC'
+};
+
+// Updated filter fields
+const filterableFields = [
+    'Value Stream Name',
+    'Delivery Partner',
+    'Epic Name',
+    'Dependency Title',
+    'Needed By'
+];
+
+const fileInput = document.getElementById('csvFile');
+const jsonInput = document.getElementById('jsonFile');
+const fileNameSpan = document.getElementById('fileName');
+const saveBtn = document.getElementById('saveBtn');
+const filtersDiv = document.getElementById('filters');
+const legendDiv = document.getElementById('legend');
+const heatmapContainer = document.getElementById('heatmapContainer');
+const topScrollShell = document.getElementById('topScrollShell');
+const topScrollInner = document.getElementById('topScrollInner');
+const addPartnerBtn = document.getElementById('addPartnerBtn');
+const addInitiativeBtn = document.getElementById('addInitiativeBtn');
+
+/* CSV File Upload */
+fileInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    currentFileName = file.name;
+    fileNameSpan.textContent = currentFileName;
+    Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: ({ data }) => {
+            csvData = data;
+            filteredData = csvData;
+            cellData = {}; // Reset cell data when loading new CSV
+            manualPartners = []; // Reset manual partners
+            manualInitiatives = []; // Reset manual initiatives
+            renamedPartners = {}; // Reset renames
+            renamedInitiatives = {};
+            deletedPartners = []; // Reset deletes
+            deletedInitiatives = [];
+            activeFilters = {}; // Reset filters
+            createFilters();
+            renderHeatmap();
+            saveBtn.style.display = 'block';
+            legendDiv.style.display = 'block';
+            filtersDiv.classList.add('active');
+            addPartnerBtn.style.display = 'inline-flex';
+            addInitiativeBtn.style.display = 'inline-flex';
+        }
+    });
+});
+
+/* JSON File Load */
+jsonInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        try {
+            const loadedData = JSON.parse(event.target.result);
+            
+            // Validate the loaded data
+            if (!loadedData.csvData || !Array.isArray(loadedData.csvData)) {
+                alert('Invalid JSON file format. Missing or invalid CSV data.');
+                return;
+            }
+            
+            // Load the data
+            csvData = loadedData.csvData || [];
+            cellData = loadedData.cellData || {};
+            manualPartners = loadedData.manualPartners || [];
+            manualInitiatives = loadedData.manualInitiatives || [];
+            renamedPartners = loadedData.renamedPartners || {};
+            renamedInitiatives = loadedData.renamedInitiatives || {};
+            deletedPartners = loadedData.deletedPartners || [];
+            deletedInitiatives = loadedData.deletedInitiatives || [];
+            activeFilters = loadedData.activeFilters || {};
+            
+            // Update UI
+            currentFileName = `Loaded from ${file.name}`;
+            fileNameSpan.textContent = currentFileName;
+            
+            // Apply filters and render
+            filteredData = csvData;
+            createFilters();
+            
+            // Restore filter selections
+            Object.entries(activeFilters).forEach(([field, value]) => {
+                const select = document.getElementById(`filter-${field}`);
+                if (select) {
+                    select.value = value;
+                }
+            });
+            
+            // Apply the filters
+            if (Object.keys(activeFilters).length > 0) {
+                applyFilters();
+            } else {
+                renderHeatmap();
+            }
+            
+            // Show controls
+            saveBtn.style.display = 'block';
+            legendDiv.style.display = 'block';
+            filtersDiv.classList.add('active');
+            addPartnerBtn.style.display = 'inline-flex';
+            addInitiativeBtn.style.display = 'inline-flex';
+            
+            // Show success message
+            const timestamp = loadedData.timestamp ? 
+                ` (saved ${new Date(loadedData.timestamp).toLocaleString()})` : '';
+            alert(`Data loaded successfully${timestamp}`);
+            
+        } catch (error) {
+            console.error('Error loading JSON:', error);
+            alert('Failed to load JSON file. Please ensure it\'s a valid saved heatmap file.');
+        }
+    };
+    
+    reader.readAsText(file);
+    
+    // Reset the file input so the same file can be loaded again if needed
+    jsonInput.value = '';
+});
+
+/* Helper function to get the display name for a partner */
+function getPartnerDisplayName(originalName) {
+    return renamedPartners[originalName] || originalName;
+}
+
+/* Helper function to get the display name for an initiative */
+function getInitiativeDisplayName(originalName) {
+    return renamedInitiatives[originalName] || originalName;
+}
+
+/* Partner Management */
+document.getElementById('addPartnerBtn').addEventListener('click', () => {
+    currentPartner = null;
+    document.getElementById('partnerModalTitle').textContent = 'Add Partner';
+    document.getElementById('partnerName').value = '';
+    document.getElementById('deletePartnerBtn').style.display = 'none';
+    document.getElementById('partnerModal').classList.add('active');
+});
+
+function editPartner(partner) {
+    currentPartner = partner;
+    document.getElementById('partnerModalTitle').textContent = 'Edit Partner';
+    document.getElementById('partnerName').value = partner;
+    document.getElementById('deletePartnerBtn').style.display = 'inline-block';
+    document.getElementById('partnerModal').classList.add('active');
+}
+
+document.getElementById('savePartnerBtn').addEventListener('click', () => {
+    const newName = document.getElementById('partnerName').value.trim();
+    if (!newName) {
+        alert('Please enter a partner name.');
+        return;
+    }
+    
+    if (currentPartner) {
+        // Edit existing partner - update rename mapping
+        // Find the original name (could be in CSV data or manual partners)
+        let originalName = null;
+        
+        // Check if it's a manual partner
+        if (manualPartners.includes(currentPartner)) {
+            manualPartners = manualPartners.map(p => p === currentPartner ? newName : p);
+        } else {
+            // It's from CSV data - track the rename
+            // Find the original name by checking if currentPartner is already a renamed version
+            originalName = Object.keys(renamedPartners).find(key => renamedPartners[key] === currentPartner) || currentPartner;
+            
+            if (newName !== originalName) {
+                renamedPartners[originalName] = newName;
+            } else {
+                // Reverting to original name
+                delete renamedPartners[originalName];
+            }
+        }
+        
+        // Update cellData keys
+        const newCellData = {};
+        Object.entries(cellData).forEach(([key, value]) => {
+            const [partner, initiative] = key.split('|||');
+            if (partner === currentPartner) {
+                newCellData[`${newName}|||${initiative}`] = value;
+            } else {
+                newCellData[key] = value;
+            }
+        });
+        cellData = newCellData;
+    } else {
+        // Add new partner
+        if (!manualPartners.includes(newName)) {
+            manualPartners.push(newName);
+        }
+    }
+    
+    document.getElementById('partnerModal').classList.remove('active');
+    updateFilterOptions(); // Update filter options to reflect the rename
+    renderHeatmap();
+});
+
+document.getElementById('deletePartnerBtn').addEventListener('click', () => {
+    if (!currentPartner) return;
+    
+    if (confirm(`Are you sure you want to delete "${currentPartner}"? This will also delete all associated data.`)) {
+        // Check if it's a manual partner
+        if (manualPartners.includes(currentPartner)) {
+            manualPartners = manualPartners.filter(p => p !== currentPartner);
+        } else {
+            // It's from CSV data - add to deleted list
+            const originalName = Object.keys(renamedPartners).find(key => renamedPartners[key] === currentPartner) || currentPartner;
+            deletedPartners.push(originalName);
+            delete renamedPartners[originalName];
+        }
+        
+        // Remove from cellData
+        const newCellData = {};
+        Object.entries(cellData).forEach(([key, value]) => {
+            const [partner] = key.split('|||');
+            if (partner !== currentPartner) {
+                newCellData[key] = value;
+            }
+        });
+        cellData = newCellData;
+        
+        document.getElementById('partnerModal').classList.remove('active');
+        updateFilterOptions();
+        renderHeatmap();
+    }
+});
+
+/* Initiative Management */
+document.getElementById('addInitiativeBtn').addEventListener('click', () => {
+    currentInitiative = null;
+    document.getElementById('initiativeModalTitle').textContent = 'Add Initiative';
+    document.getElementById('initiativeName').value = '';
+    document.getElementById('deleteInitiativeBtn').style.display = 'none';
+    document.getElementById('initiativeModal').classList.add('active');
+});
+
+function editInitiative(initiative) {
+    currentInitiative = initiative;
+    document.getElementById('initiativeModalTitle').textContent = 'Edit Initiative';
+    document.getElementById('initiativeName').value = initiative;
+    document.getElementById('deleteInitiativeBtn').style.display = 'inline-block';
+    document.getElementById('initiativeModal').classList.add('active');
+}
+
+document.getElementById('saveInitiativeBtn').addEventListener('click', () => {
+    const newName = document.getElementById('initiativeName').value.trim();
+    if (!newName) {
+        alert('Please enter an initiative name.');
+        return;
+    }
+    
+    if (currentInitiative) {
+        // Edit existing initiative
+        if (manualInitiatives.includes(currentInitiative)) {
+            manualInitiatives = manualInitiatives.map(i => i === currentInitiative ? newName : i);
+        } else {
+            // It's from CSV data - track the rename
+            const originalName = Object.keys(renamedInitiatives).find(key => renamedInitiatives[key] === currentInitiative) || currentInitiative;
+            
+            if (newName !== originalName) {
+                renamedInitiatives[originalName] = newName;
+            } else {
+                // Reverting to original name
+                delete renamedInitiatives[originalName];
+            }
+        }
+        
+        // Update cellData keys
+        const newCellData = {};
+        Object.entries(cellData).forEach(([key, value]) => {
+            const [partner, initiative] = key.split('|||');
+            if (initiative === currentInitiative) {
+                newCellData[`${partner}|||${newName}`] = value;
+            } else {
+                newCellData[key] = value;
+            }
+        });
+        cellData = newCellData;
+    } else {
+        // Add new initiative
+        if (!manualInitiatives.includes(newName)) {
+            manualInitiatives.push(newName);
+        }
+    }
+    
+    document.getElementById('initiativeModal').classList.remove('active');
+    renderHeatmap();
+});
+
+document.getElementById('deleteInitiativeBtn').addEventListener('click', () => {
+    if (!currentInitiative) return;
+    
+    if (confirm(`Are you sure you want to delete "${currentInitiative}"? This will also delete all associated data.`)) {
+        // Check if it's a manual initiative
+        if (manualInitiatives.includes(currentInitiative)) {
+            manualInitiatives = manualInitiatives.filter(i => i !== currentInitiative);
+        } else {
+            // It's from CSV data - add to deleted list
+            const originalName = Object.keys(renamedInitiatives).find(key => renamedInitiatives[key] === currentInitiative) || currentInitiative;
+            deletedInitiatives.push(originalName);
+            delete renamedInitiatives[originalName];
+        }
+        
+        // Remove from cellData
+        const newCellData = {};
+        Object.entries(cellData).forEach(([key, value]) => {
+            const [, initiative] = key.split('|||');
+            if (initiative !== currentInitiative) {
+                newCellData[key] = value;
+            }
+        });
+        cellData = newCellData;
+        
+        document.getElementById('initiativeModal').classList.remove('active');
+        renderHeatmap();
+    }
+});
+
+/* Close modals */
+document.getElementById('closePartnerModal').addEventListener('click', () => {
+    document.getElementById('partnerModal').classList.remove('active');
+});
+document.getElementById('cancelPartnerBtn').addEventListener('click', () => {
+    document.getElementById('partnerModal').classList.remove('active');
+});
+
+document.getElementById('closeInitiativeModal').addEventListener('click', () => {
+    document.getElementById('initiativeModal').classList.remove('active');
+});
+document.getElementById('cancelInitiativeBtn').addEventListener('click', () => {
+    document.getElementById('initiativeModal').classList.remove('active');
+});
+
+/* Filters UI */
+document.getElementById('filterHeader').addEventListener('click', () => {
+    filtersDiv.classList.toggle('collapsed');
+});
+
+function createFilters() {
+    const grid = document.getElementById('filterGrid');
+    grid.innerHTML = '';
+    filterableFields.forEach(f => {
+        const group = document.createElement('div');
+        group.className = 'filter-group';
+        const label = document.createElement('label');
+        label.textContent = f;
+        const select = document.createElement('select');
+        select.id = `filter-${f}`;
+        select.dataset.field = f;
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '-- All --';
+        select.appendChild(opt);
+        
+        // Add event listeners for focus and change
+        select.addEventListener('focus', () => {
+            currentlyFocusedField = f;
+            populateFilterOptions(f, true); // true means show all values
+        });
+        
+        select.addEventListener('blur', () => {
+            // Delay to allow click to register
+            setTimeout(() => {
+                if (currentlyFocusedField === f) {
+                    currentlyFocusedField = null;
+                    updateFilterOptions(); // Restore filtered view
+                }
+            }, 200);
+        });
+        
+        select.addEventListener('change', handleFilterChange);
+        
+        group.appendChild(label);
+        group.appendChild(select);
+        grid.appendChild(group);
+    });
+    updateFilterOptions();
+}
+
+function handleFilterChange() {
+    activeFilters = {};
+    filterableFields.forEach(f => {
+        const sel = document.getElementById(`filter-${f}`);
+        if (sel && sel.value) activeFilters[f] = sel.value;
+    });
+    updateFilterOptions();
+    applyFilters();
+}
+
+function populateFilterOptions(fieldName, showAll = false) {
+    const select = document.getElementById(`filter-${fieldName}`);
+    if (!select) return;
+    
+    const current = select.value;
+    
+    let dataToFilter = csvData;
+    
+    // If not showing all, apply filters from OTHER fields
+    if (!showAll) {
+        dataToFilter = csvData.filter(row => {
+            for (const [k, v] of Object.entries(activeFilters)) {
+                if (k !== fieldName && row[k] !== v) return false;
+            }
+            return true;
+        });
+    } else {
+        // When showing all, still respect OTHER filters (not this field's filter)
+        const otherFilters = {...activeFilters};
+        delete otherFilters[fieldName];
+        
+        dataToFilter = csvData.filter(row => {
+            for (const [k, v] of Object.entries(otherFilters)) {
+                if (row[k] !== v) return false;
+            }
+            return true;
+        });
+    }
+    
+    const values = [...new Set(dataToFilter.map(r => r[fieldName]))]
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b));
+    
+    // Add manual partners/initiatives if this is the Delivery Partner field
+    if (fieldName === 'Delivery Partner') {
+        // Apply renaming to filter values
+        const renamedValues = values.map(v => getPartnerDisplayName(v));
+        const allPartners = [...new Set([...renamedValues, ...manualPartners])]
+            .filter(p => !deletedPartners.includes(p))
+            .sort((a, b) => a.localeCompare(b));
+        
+        // Rebuild options
+        while (select.options.length > 1) select.remove(1);
+        allPartners.forEach(val => {
+            const o = document.createElement('option');
+            o.value = val;
+            o.textContent = val;
+            if (val === current) o.selected = true;
+            select.appendChild(o);
+        });
+        return;
+    }
+    
+    // Rebuild options
+    while (select.options.length > 1) select.remove(1);
+    values.forEach(val => {
+        const o = document.createElement('option');
+        o.value = val;
+        o.textContent = val;
+        if (val === current) o.selected = true;
+        select.appendChild(o);
+    });
+}
+
+function updateFilterOptions() {
+    filterableFields.forEach(f => {
+        // Don't update the currently focused field
+        if (f !== currentlyFocusedField) {
+            populateFilterOptions(f, false);
+        }
+    });
+}
+
+function applyFilters() {
+    filteredData = csvData.filter(row => {
+        for (const [k,v] of Object.entries(activeFilters)) {
+            if (k === 'Delivery Partner') {
+                // Special handling for Delivery Partner to account for renames
+                const displayName = getPartnerDisplayName(row[k]);
+                if (displayName !== v) return false;
+            } else {
+                if (row[k] !== v) return false;
+            }
+        }
+        return true;
+    });
+    renderHeatmap();
+}
+
+document.getElementById('clearFilters').addEventListener('click', () => {
+    activeFilters = {};
+    filteredData = csvData;
+    filterableFields.forEach(f => {
+        const sel = document.getElementById(`filter-${f}`);
+        if (sel) sel.value = '';
+    });
+    updateFilterOptions();
+    renderHeatmap();
+});
+
+/* Heatmap */
+function renderHeatmap() {
+    if (!filteredData.length && !Object.keys(cellData).length && !manualPartners.length && !manualInitiatives.length) {
+        heatmapContainer.innerHTML = document.getElementById('emptyState').outerHTML;
+        syncTopScroller();
+        return;
+    }
+
+    // Get partners and initiatives from all sources, applying renames and deletes
+    const partnersFromData = [...new Set(filteredData.map(r => r['Delivery Partner']))]
+        .filter(Boolean)
+        .filter(p => !deletedPartners.includes(p))
+        .map(p => getPartnerDisplayName(p));
+    
+    const partnersFromCells = Object.keys(cellData)
+        .filter(key => cellData[key].status)
+        .map(key => key.split('|||')[0]);
+    
+    const partners = [...new Set([...partnersFromData, ...partnersFromCells, ...manualPartners])]
+        .sort((a,b)=>a.localeCompare(b));
+
+    const initiativesFromData = [...new Set(filteredData.map(r => r['Initiative Name']))]
+        .filter(Boolean)
+        .filter(i => !deletedInitiatives.includes(i))
+        .map(i => getInitiativeDisplayName(i));
+    
+    const initiativesFromCells = Object.keys(cellData)
+        .filter(key => cellData[key].status)
+        .map(key => key.split('|||')[1]);
+    
+    const initiatives = [...new Set([...initiativesFromData, ...initiativesFromCells, ...manualInitiatives])]
+        .sort((a,b)=>a.localeCompare(b));
+
+    const matrix = {};
+    partners.forEach(p => {
+        matrix[p] = {};
+        initiatives.forEach(i => matrix[p][i] = []);
+    });
+
+    filteredData.forEach(r => {
+        const originalPartner = r['Delivery Partner'];
+        const originalInitiative = r['Initiative Name'];
+        
+        // Skip deleted items
+        if (deletedPartners.includes(originalPartner) || deletedInitiatives.includes(originalInitiative)) {
+            return;
+        }
+        
+        const p = getPartnerDisplayName(originalPartner);
+        const i = getInitiativeDisplayName(originalInitiative);
+        const s = r['Engagement Status'];
+        
+        if (p && i && s) matrix[p][i].push(s);
+    });
+
+    let html = '<table class="heatmap"><thead><tr><th>Delivery Partner</th>';
+    initiatives.forEach(i => html += `<th title="Click to edit" data-initiative="${i}">${i}</th>`);
+    html += '</tr></thead><tbody>';
+
+    partners.forEach(p => {
+        html += `<tr><td title="Click to edit" data-partner="${p}">${p}</td>`;
+        initiatives.forEach(i => {
+            const arr = matrix[p][i];
+            const key = `${p}|||${i}`;
+            const info = cellData[key] || { comment:'', flag:'', status:'' };
+
+            let color, primaryStatus;
+            let hasData = false;
+            
+            // Check if status is explicitly cleared
+            if (info.status === 'cleared') {
+                // Cell has been explicitly cleared
+                color = '#f8f9fa';
+                primaryStatus = '';
+            } else if (info.status && info.status !== '') {
+                // Manual status overrides CSV data
+                primaryStatus = info.status;
+                color = statusColors[primaryStatus] || '#f0f0f0';
+                hasData = true;
+            } else if (arr.length) {
+                // Use CSV data
+                const counts = {};
+                arr.forEach(s => counts[s] = (counts[s] || 0) + 1);
+                primaryStatus = Object.keys(counts).sort((a,b)=>counts[b]-counts[a])[0];
+                color = statusColors[primaryStatus] || '#f0f0f0';
+                hasData = true;
+            } else {
+                // Empty cell
+                color = '#f8f9fa';
+                primaryStatus = '';
+            }
+            
+            const hasComment = !!(info.comment && info.comment.trim() !== '');
+            
+            if (hasData) {
+                html += `<td style="background:${color};" data-cell="${key}" data-has-csv="${arr.length > 0}">
+                    <div class="cell-content">
+                        <span class="cell-partner-name">${p}</span>
+                        <div class="cell-flags">
+                            ${info.flag === 'yellow' ? '<span class="flag-dot flag-yellow"></span>' : ''}
+                            ${info.flag === 'red' ? '<span class="flag-dot flag-red"></span>' : ''}
+                        </div>
+                        ${hasComment ? '<span class="cell-comment-indicator"></span>' : ''}
+                    </div>
+                </td>`;
+            } else {
+                html += `<td style="background:${color};" data-cell="${key}" data-has-csv="false">
+                    <div class="cell-content"><span class="cell-partner-name" style="color:#bbb;">—</span></div>
+                </td>`;
+            }
+        });
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    heatmapContainer.innerHTML = html;
+
+    // Cell click
+    heatmapContainer.querySelectorAll('[data-cell]').forEach(td => {
+        td.addEventListener('click', () => {
+            const hasCsv = td.dataset.hasCsv === 'true';
+            openCommentModal(td.dataset.cell, hasCsv);
+        });
+    });
+
+    // Partner row header click
+    heatmapContainer.querySelectorAll('td[data-partner]').forEach(td => {
+        td.addEventListener('click', (e) => {
+            e.stopPropagation();
+            editPartner(td.dataset.partner);
+        });
+    });
+
+    // Initiative column header click
+    heatmapContainer.querySelectorAll('th[data-initiative]').forEach(th => {
+        th.addEventListener('click', (e) => {
+            e.stopPropagation();
+            editInitiative(th.dataset.initiative);
+        });
+    });
+
+    syncTopScroller();
+}
+
+/* Top scrollbar sync */
+let syncing = false;
+function syncTopScroller() {
+    const table = heatmapContainer.querySelector('table');
+    if (!table) {
+        topScrollInner.style.width = '0px';
+        return;
+    }
+    topScrollInner.style.width = table.scrollWidth + 'px';
+    // Keep scroll positions consistent
+    topScrollShell.scrollLeft = heatmapContainer.scrollLeft;
+}
+
+topScrollShell.addEventListener('scroll', () => {
+    if (syncing) return;
+    syncing = true;
+    heatmapContainer.scrollLeft = topScrollShell.scrollLeft;
+    syncing = false;
+});
+heatmapContainer.addEventListener('scroll', () => {
+    if (syncing) return;
+    syncing = true;
+    topScrollShell.scrollLeft = heatmapContainer.scrollLeft;
+    syncing = false;
+});
+
+/* Modal Logic */
+function openCommentModal(cellKey, hasCsvData = false) {
+    currentCell = cellKey;
+    const [partner, initiative] = cellKey.split('|||');
+    const info = cellData[cellKey] || { comment:'', flag:'', status:'' };
+    
+    // Get the actual CSV data status if it exists
+    let csvStatus = '';
+    const csvRows = filteredData.filter(r => {
+        const p = getPartnerDisplayName(r['Delivery Partner']);
+        const i = getInitiativeDisplayName(r['Initiative Name']);
+        return p === partner && i === initiative && r['Engagement Status'];
+    });
+    
+    if (csvRows.length > 0) {
+        const counts = {};
+        csvRows.forEach(r => {
+            const s = r['Engagement Status'];
+            counts[s] = (counts[s] || 0) + 1;
+        });
+        csvStatus = Object.keys(counts).sort((a,b)=>counts[b]-counts[a])[0];
+    }
+    
+    // Build modal info with current status
+    let modalInfoHtml = `
+        <p><strong>Delivery Partner:</strong> ${partner}</p>
+        <p><strong>Initiative:</strong> ${initiative}</p>
+    `;
+    
+    if (csvStatus) {
+        const color = statusColors[csvStatus] || '#f0f0f0';
+        modalInfoHtml += `
+            <div class="current-status">
+                <strong>CSV Data Status:</strong>
+                <span class="status-badge" style="background:${color}; color:#fff;">${csvStatus}</span>
+            </div>
+        `;
+    }
+    
+    if (info.status && info.status !== 'cleared') {
+        const color = statusColors[info.status] || '#f0f0f0';
+        modalInfoHtml += `
+            <div class="current-status">
+                <strong>Manual Override:</strong>
+                <span class="status-badge" style="background:${color}; color:#fff;">${info.status}</span>
+            </div>
+        `;
+    } else if (info.status === 'cleared') {
+        modalInfoHtml += `
+            <div class="current-status">
+                <strong>Status:</strong>
+                <span class="status-badge" style="background:#f8f9fa; color:#666; border:1px solid #dee2e6;">Manually Cleared</span>
+            </div>
+        `;
+    }
+    
+    document.getElementById('modalInfo').innerHTML = modalInfoHtml;
+    
+    // Show/hide the clear override button
+    const overrideActions = document.getElementById('overrideActions');
+    
+    if (info.status === 'cleared' || (info.status && info.status !== '')) {
+        overrideActions.style.display = 'block';
+    } else {
+        overrideActions.style.display = 'none';
+    }
+    
+    // Always show status section for all cells
+    const statusSection = document.getElementById('statusSection');
+    statusSection.style.display = 'block';
+    
+    // Set the current status radio
+    const statusRadios = document.querySelectorAll('input[name="status"]');
+    
+    // Determine which radio to select
+    if (!info.status || info.status === '') {
+        // No manual override - select "Use CSV Data"
+        statusRadios.forEach(r => {
+            r.checked = (r.value === 'use-csv');
+        });
+    } else if (info.status === 'cleared') {
+        // Manually cleared - select "Clear (Blank)"
+        statusRadios.forEach(r => {
+            r.checked = (r.value === '');
+        });
+    } else {
+        // Manual status is set
+        statusRadios.forEach(r => {
+            r.checked = (r.value === info.status);
+        });
+    }
+    
+    // Hide/show "Use CSV Data" option based on whether CSV data exists
+    const useCsvOption = document.querySelector('input[value="use-csv"]').closest('.status-option');
+    if (csvStatus) {
+        useCsvOption.style.display = 'flex';
+    } else {
+        useCsvOption.style.display = 'none';
+    }
+    
+    document.getElementById('commentText').value = info.comment || '';
+        document.querySelectorAll('input[name="flag"]').forEach(r => {
+        r.checked = (r.value === (info.flag || ''));
+    });
+    document.getElementById('commentModal').classList.add('active');
+}
+
+// Add event listener for clear override button
+document.getElementById('clearOverrideBtn').addEventListener('click', () => {
+    if (!currentCell) return;
+    
+    const info = cellData[currentCell] || {};
+    
+    // Remove the status override
+    delete info.status;
+    
+    // If there's nothing left in the cell data, remove it entirely
+    if (!info.comment && !info.flag) {
+        delete cellData[currentCell];
+    } else {
+        cellData[currentCell] = info;
+    }
+    
+    closeCommentModal();
+    renderHeatmap();
+});
+
+function closeCommentModal() {
+    document.getElementById('commentModal').classList.remove('active');
+    currentCell = null;
+}
+
+document.getElementById('closeModal').addEventListener('click', closeCommentModal);
+document.getElementById('cancelBtn').addEventListener('click', closeCommentModal);
+document.getElementById('commentModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeCommentModal();
+});
+
+document.getElementById('saveCommentBtn').addEventListener('click', () => {
+    if (!currentCell) return;
+    const comment = document.getElementById('commentText').value;
+    const flag = document.querySelector('input[name="flag"]:checked').value;
+    
+    const statusRadio = document.querySelector('input[name="status"]:checked');
+    let status = statusRadio ? statusRadio.value : undefined;
+    
+    // Handle status updates
+    if (status === 'use-csv') {
+        // User wants to use CSV data - remove any override
+        status = undefined;
+    } else if (status === '') {
+        // User selected "Clear (Blank)"
+        status = 'cleared';
+    }
+    
+    // Build the cell data object
+    const newCellData = {};
+    if (comment) newCellData.comment = comment;
+    if (flag) newCellData.flag = flag;
+    if (status !== undefined) newCellData.status = status;
+    
+    // Save or delete the cell data
+    if (Object.keys(newCellData).length > 0) {
+        cellData[currentCell] = newCellData;
+    } else {
+        delete cellData[currentCell];
+    }
+    
+    closeCommentModal();
+    renderHeatmap();
+});
+
+/* Save data */
+saveBtn.addEventListener('click', () => {
+    const data = {
+        csvData,
+        cellData,
+        manualPartners,
+        manualInitiatives,
+        renamedPartners,
+        renamedInitiatives,
+        deletedPartners,
+        deletedInitiatives,
+        activeFilters,
+        timestamp: new Date().toISOString(),
+        savedBy: 'Michael-Curran_iag',
+        fileName: currentFileName
+    };
+    const blob = new Blob([JSON.stringify(data,null,2)], { type:'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `heatmap-data-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    alert('Data saved successfully!');
+});
+
+/* Responsive recalculation on resize (for top scroll bar width) */
+window.addEventListener('resize', () => {
+    syncTopScroller();
+});
+</script>
+</body>
+</html>
